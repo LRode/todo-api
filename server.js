@@ -123,5 +123,16 @@ db.sequelize.sync().then(function () {
 });
 
 
+// POST /users
+app.post('/users', function(req, res) {
+	var body = _.pick(req.body, 'email', 'password');
+
+	db.todo.create(body).then(function (user){
+		res.json(user.toJSON());
+	}, function (e) {
+		res.status(400).json(e);
+	});
+});
+
 
 });
