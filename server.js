@@ -10,6 +10,7 @@ var PORT = process.env.PORT || 3000;
 var todos = [];
 var todoNextId = 1;
 
+
 app.use(bodyParser.json());
 
 app.get('/', function(req, res) {
@@ -69,10 +70,9 @@ app.post('/todos', middleware.requireAuthentication, function(req, res) {
 	var body = _.pick(req.body, 'description', 'completed');
 
 	db.todo.create(body).then(function(todo) {
-		
 		req.user.addTodo(todo).then(function () {
 			return todo.reload();
-		}).then (function (todo){
+		}).then(function (todo) {
 			res.json(todo.toJSON());
 		});
 	}, function(e) {
@@ -81,14 +81,13 @@ app.post('/todos', middleware.requireAuthentication, function(req, res) {
 });
 
 // DELETE /todos/:id
-app.delete('/todos/:id', middleware.requireAuthentication,  function(req, res) {
+app.delete('/todos/:id', middleware.requireAuthentication, function(req, res) {
 	var todoId = parseInt(req.params.id, 10);
 
 	db.todo.destroy({
 		where: {
 			id: todoId,
 			userId: req.user.get('id')
-
 		}
 	}).then(function(rowsDeleted) {
 		if (rowsDeleted === 0) {
@@ -150,24 +149,32 @@ app.post('/users', function (req, res) {
 // POST /users/login
 app.post('/users/login', function (req, res) {
 	var body = _.pick(req.body, 'email', 'password');
+	var userInstance;
 
 	db.user.authenticate(body).then(function (user) {
 		var token = user.generateToken('authentication');
+		userInstance = user;
 
-		if (token){
-			res.header('Auth', token).json(user.toPublicJSON());
-		}
-		else{
-			res.send(401).send();
-		}
-	}, function (e) {
-		res.send(401).send();
+		return db.token.create({
+			token: token
+		});
+	}).then(function (tokenInstance) {
+		res.header('Auth', tokenInstance.get('token')).json(userInstance.toPublicJSON());
+	}).catch(function () {
+		res.status(401).send();
 	});
 });
 
+// DELETE /users/login
+app.delete('/users/login', middleware.requireAuthentication, function (req, res) {
+	req.token.destroy().then(function () {
+		res.status(204).send();
+	}, function () {
+		res.status(500).send();
+	});
+});
 
-
-db.sequelize.sync().then(function() {
+db.sequelize.sync({force: true}).then(function() {
 	app.listen(PORT, function() {
 		console.log('Express listening on port ' + PORT + '!');
 	});
